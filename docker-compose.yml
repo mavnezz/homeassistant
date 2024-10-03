@@ -1,0 +1,95 @@
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: lscr.io/linuxserver/homeassistant:latest
+    restart: unless-stopped
+    network_mode: host
+    #ports:
+    #  - 8123:8123
+    volumes:
+      - /m2/AppData/homeassistant/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      #- local_data:/.local     
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+    #user: "1000:1000"
+
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto:latest
+    restart: unless-stopped
+    ports:
+      - 1883:1883
+      - 9001:9001
+    volumes:
+      - /m2/AppData/mosquitto/config:/mosquitto/config
+      - /m2/AppData/mosquitto/data:/mosquitto/data
+      - /m2/AppData/mosquitto/log:/mosquitto/log
+    environment:
+      - TZ=Europe/Berlin
+    #user: "1000:1000"
+
+  zigbee2mqtt:
+    container_name: zigbee2mqtt
+    image: koenkk/zigbee2mqtt:latest
+    restart: unless-stopped
+    volumes:
+      - /m2/AppData/zigbee2mqtt:/app/data
+      - /run/udev:/run/udev:ro
+    ports:
+      - 8080:8080
+    healthcheck:
+      test: "wget --no-verbose --tries=1 --header 'Host: ******' --spider http://localhost:8080 || exit 1"
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    environment:
+      - TZ=Europe/Berlin
+    group_add:
+      - dialout
+    user: 1000:1000
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+
+  ring-mqtt:
+    container_name: ring-mqtt
+    restart: unless-stopped
+    image: tsightler/ring-mqtt
+    ports:
+      - 55123:55123
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -f /data/ring-state.json ]; then exit 0; else exit 1; fi"]
+      interval: 15s
+      timeout: 10s
+      retries: 4
+      start_period: 30s
+    environment:
+      - BRANCH="dev"
+    volumes:
+      - /m2/AppData/ring-mqtt:/data           
+    logging:                           
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  piper:
+    image: lscr.io/linuxserver/piper:latest
+    container_name: piper
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - PIPER_VOICE=de_DE-thorsten-high
+      - PIPER_LENGTH=1.0 #optional
+      - PIPER_NOISE=0.667 #optional
+      - PIPER_NOISEW=0.333 #optional
+      - PIPER_SPEAKER=0 #optional
+      - PIPER_PROCS=1 #optional
+    volumes:
+      - /m2/AppData/piper:/config
+    ports:
+      - 10200:10200
+    restart: unless-stopped
